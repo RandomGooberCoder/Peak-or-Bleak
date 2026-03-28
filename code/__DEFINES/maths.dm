@@ -4,6 +4,8 @@
 
 #define NUM_E 2.71828183
 
+#define SQRT_2 1.414214
+
 #define PI						3.1416
 #define INFINITY				1e31	//closer then enough
 
@@ -212,4 +214,6 @@
 #define LORENTZ_CUMULATIVE_DISTRIBUTION(x, y, s) ( (1/PI)*TORADIANS(arctan((x-y)/s)) + 1/2 )
 
 #define RULE_OF_THREE(a, b, x) ((a*x)/b)
-// )
+
+/// Magnitude. used for blimpmap token velocity
+#define MAGNITUDE(a, b) (sqrt(a ** 2 + b ** 2))

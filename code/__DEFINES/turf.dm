@@ -13,3 +13,5 @@
 #define TURF_BEING_WEATHERED (1<<4)
 /// Turf is currently queued in GLOB.SUNLIGHT_QUEUE_CORNER and should not be re-queued to avoid duplicates
 #define TURF_SUNLIGHT_QUEUED (1<<5)
+
+GLOBAL_LIST_EMPTY(created_baseturf_lists)

@@ -432,7 +432,7 @@ GLOBAL_LIST_INIT(roleplay_readme, world.file2list("strings/rt/rp_prompt.txt"))
 		return JOB_UNAVAILABLE_GENERIC
 	return JOB_AVAILABLE
 
-/mob/dead/new_player/proc/AttemptLateSpawn(rank)
+/mob/dead/new_player/proc/AttemptLateSpawn(rank, datum/overmap/ship/controlled/ship)
 	var/error = IsJobUnavailable(rank)
 	if(error != JOB_AVAILABLE)
 		to_chat(src, span_warning("[get_job_unavailable_error_message(error, rank)]"))
@@ -545,110 +545,9 @@ GLOBAL_LIST_INIT(roleplay_readme, world.file2list("strings/rt/rp_prompt.txt"))
 
 /mob/dead/new_player/proc/LateChoices()
 	var/list/dat = list("<div class='notice' style='font-style: normal; font-size: 14px; margin-bottom: 2px; padding-bottom: 0px'>Round Duration: [DisplayTimeText(world.time - SSticker.round_start_time, 1)]</div>")
-	for(var/datum/job/prioritized_job in SSjob.prioritized_jobs)
-		if(prioritized_job.current_positions >= prioritized_job.total_positions)
-			SSjob.prioritized_jobs -= prioritized_job
-	dat += "<table><tr><td valign='top'>"
-	var/column_counter = 0
-
-	var/list/omegalist = list()
-	omegalist += list(GLOB.noble_positions)
-	omegalist += list(GLOB.courtier_positions)
-	omegalist += list(GLOB.retinue_positions)
-	omegalist += list(GLOB.garrison_positions)
-	omegalist += list(GLOB.church_positions)
-	omegalist += list(GLOB.burgher_positions)
-	omegalist += list(GLOB.peasant_positions)
-	omegalist += list(GLOB.sidefolk_positions)
-	omegalist += list(GLOB.wanderer_positions)
-	omegalist += list(GLOB.inquisition_positions)
-	omegalist += list(GLOB.antagonist_positions)
-
-	for(var/list/category in omegalist)
-		if(!SSjob.name_occupations[category[1]])
-
-			continue
-
-		var/list/available_jobs = list()
-		for(var/job in category)
-			var/datum/job/job_datum = SSjob.name_occupations[job]
-			if(!job_datum)
-				continue
-			// Make sure hiv+ jobs always appear on list, even if unavailable
-			var/is_job_available = (IsJobUnavailable(job_datum.title, TRUE) == JOB_AVAILABLE)
-			if(job_datum.always_show_on_latechoices)
-				is_job_available = TRUE
-			if(is_job_available)
-				available_jobs += job
-
-		if (length(available_jobs))
-			var/cat_color = SSjob.name_occupations[category[1]].selection_color //use the color of the first job in the category (the department head) as the category color
-			var/cat_name = ""
-			switch (SSjob.name_occupations[category[1]].department_flag)
-				if (NOBLEMEN)
-					cat_name = "Ducal Family"
-				if (COURTIERS)
-					cat_name = "Courtiers"
-				if (RETINUE)
-					cat_name = "Retinue"
-				if (GARRISON)
-					cat_name = "Garrison"
-				if (CHURCHMEN)
-					cat_name = "Churchmen"
-				if (BURGHERS)
-					cat_name = "Burghers"
-				if (PEASANTS)
-					cat_name = "Peasants"
-				if (SIDEFOLK)
-					cat_name = "Sidefolk"
-				if (WANDERERS)
-					cat_name = "Wanderers"
-				if (INQUISITION)
-					cat_name = "Inquisition"
-				if (ANTAGONIST)
-					cat_name = "Antagonists"
-
-			dat += "<fieldset style='width: 185px; border: 2px solid [cat_color]; display: inline'>"
-			dat += "<legend align='center' style='font-weight: bold; color: [cat_color]'>[cat_name]</legend>"
-
-			if(has_world_trait(/datum/world_trait/skeleton_siege))
-				dat += "<a class='job command' href='byond://?src=[REF(src)];SelectedJob=Greater Skeleton'>BECOME AN EVIL SKELETON</a>"
-				dat += "</fieldset><br>"
-				column_counter++
-				if(column_counter > 0 && (column_counter % 3 == 0))
-					dat += "</td><td valign='top'>"
-			if(has_world_trait(/datum/world_trait/goblin_siege))
-				dat += "<a class='job command' href='byond://?src=[REF(src)];SelectedJob=Goblin'>BECOME A GOBLIN</a>"
-				dat += "</fieldset><br>"
-				column_counter++
-				if(column_counter > 0 && (column_counter % 3 == 0))
-					dat += "</td><td valign='top'>"
-
-			if(has_world_trait(/datum/world_trait/skeleton_siege)|| has_world_trait(/datum/world_trait/goblin_siege))
-				break
-
-			for(var/job in available_jobs)
-				var/datum/job/job_datum = SSjob.name_occupations[job]
-				var/do_elaborate = job_datum.has_limited_subclasses()
-				if(job_datum)
-					var/command_bold = FALSE
-					if(job in GLOB.leadership_positions)
-						command_bold = TRUE
-					var/used_name = job_datum.display_title || job_datum.title
-					if(client.prefs.pronouns == SHE_HER && job_datum.f_title)
-						used_name = job_datum.f_title
-					if(job_datum in SSjob.prioritized_jobs)
-						dat += "<a class='job[command_bold]' href='byond://?src=[REF(src)];SelectedJob=[job_datum.title]'><span class='priority'>[used_name] ([job_datum.current_positions])</span></a>"
-					else
-						dat += "<font size = 3>[do_elaborate ? "<a href='?src=[REF(job_datum)];jobsubclassinfo=1'><b><font color = '#6b6743'>(!)</font></b></a>" : ""]<a href='byond://?src=[REF(src)];SelectedJob=[job_datum.title]'>[command_bold ? "<b>" : ""][used_name] ([job_datum.current_positions]/[job_datum.total_positions])[command_bold ? "</b>" : ""]</a></font>"
-						dat += "<br>"
-
-			dat += "</fieldset><br>"
-			column_counter++
-			if(column_counter > 0 && (column_counter % 4 == 0))
-				dat += "</td><td valign='top'>"
-	dat += "</td></tr></table></center>"
-	dat += "</div></div>"
+	if(!GLOB.ship_select_tgui)
+		GLOB.ship_select_tgui = new /datum/ship_select(src)
+	GLOB.ship_select_tgui.ui_interact(src)
 	var/datum/browser/popup = new(src, "latechoices", "Choose Class", 720, 580)
 	popup.add_stylesheet("playeroptions", 'html/browser/playeroptions.css')
 	popup.set_content(jointext(dat, ""))

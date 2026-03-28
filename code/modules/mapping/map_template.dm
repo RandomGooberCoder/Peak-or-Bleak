@@ -8,19 +8,20 @@
 	var/datum/parsed_map/cached_map
 	var/keep_cached_map = FALSE
 
+	/// Defaults to TRUE.
+	/// If TRUE, the baseturfs of the new turfs (ignoring baseturf_bottom and space) are added
+	/// to the top of the pre-existing baseturf lists, in accordance with the behavior of PlaceOnTop.
+	/// If FALSE, the old turfs are replaced entirely, including their baseturfs.
+	/// Note that FALSE-case behavior is altered from the original implementation, which ignored baseturfs entirely; it was intended for holodecks, which have been removed.
+	var/should_place_on_top = TRUE
+
 /datum/map_template/New(path = null, rename = null, cache = FALSE)
-	if(path && !mappath)
+	if(path)
 		mappath = path
-	if(!path && mappath)
-		path = mappath
 	if(mappath)
 		preload_size(mappath, cache)
 	if(rename)
 		name = rename
-	if(!name && id) //Make sure nothing is null, just in case
-		name = id
-	if(!id && name)
-		id = name
 
 /datum/map_template/proc/preload_size(path, cache = FALSE)
 	var/datum/parsed_map/parsed = new(file(path))
@@ -64,7 +65,7 @@
 		y,
 		level.z_value,
 		no_changeturf = (SSatoms.initialized == INITIALIZATION_INSSATOMS),
-		place_on_top = TRUE,
+		place_on_top = should_place_on_top,
 	)
 	var/list/bounds = parsed.bounds
 	if(!bounds)
@@ -120,6 +121,8 @@
 			placement = corner
 	return block(placement, locate(placement.x+width-1, placement.y+height-1, placement.z))
 
+/datum/map_template/proc/post_load()
+	return
 
 //for your ever biggening badminnery kevinz000
 //❤ - Cyberboss

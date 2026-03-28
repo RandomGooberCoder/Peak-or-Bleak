@@ -44,3 +44,9 @@
 			line += locate(current_x_step, current_y_step, starting_z)
 	return line
 
+/proc/invert_hex(hex)
+	var/length = length(hex)
+
+	var/num = hex2num(hex)
+
+	return num2hex((16 ** length) - 1 - num, length)

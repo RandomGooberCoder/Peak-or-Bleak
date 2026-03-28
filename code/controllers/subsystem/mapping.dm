@@ -49,6 +49,21 @@ SUBSYSTEM_DEF(mapping)
 	///antag retainer
 	var/datum/antag_retainer/retainer
 
+	/// List of all map zones
+	var/list/map_zones = list()
+	/// Translation of virtual level ID to a virtual level reference
+	var/list/virtual_z_translation = list()
+
+	var/list/ship_purchase_list
+	var/list/planet_types = list()
+	var/list/outpost_templates = list()
+	var/list/ruin_types_list = list()
+	var/list/ruin_types_probabilities = list()
+	var/list/mission_pois = list()
+
+	///All possible biomes in assoc list as type || instance
+	var/list/biomes = list()
+
 //dlete dis once #39770 is resolved
 /datum/controller/subsystem/mapping/proc/HACK_LoadMapConfig()
 	if(!config)
@@ -85,6 +100,7 @@ SUBSYSTEM_DEF(mapping)
 	loadWorld()
 	repopulate_sorted_areas()
 	process_teleport_locs()			//Sets up the wizard teleport locations
+	initialize_biomes()
 	preloadTemplates()
 	// Add the transit level
 	transit = add_new_zlevel("Transit/Reserved", list(ZTRAIT_RESERVED = TRUE))
@@ -130,6 +146,10 @@ SUBSYSTEM_DEF(mapping)
 
 	z_list = SSmapping.z_list
 
+	ship_purchase_list = SSmapping.ship_purchase_list
+	planet_types = SSmapping.planet_types
+	outpost_templates = SSmapping.outpost_templates
+
 #define INIT_ANNOUNCE(X) to_chat(world, "<span class='boldannounce'>[X]</span>"); log_world(X)
 /datum/controller/subsystem/mapping/proc/LoadGroup(list/errorList, name, path, files, list/traits, list/default_traits, silent = FALSE)
 	. = list()
@@ -165,7 +185,7 @@ SUBSYSTEM_DEF(mapping)
 	var/start_z = world.maxz + 1
 	var/i = 0
 	for (var/level in traits)
-		add_new_zlevel("[name][i ? " [i + 1]" : ""]", level)
+		add_new_zlevel("[name][i ? " [i + 1]" : ""]", level, reserve_completely = TRUE)
 		++i
 
 	// load the maps
@@ -310,6 +330,10 @@ SUBSYSTEM_DEF(mapping)
 //Precache the templates via map template datums, not directly from files
 //This lets us preload as many files as we want without explicitely loading ALL of them into cache (ie WIP maps or what have you)
 /datum/controller/subsystem/mapping/proc/preloadTemplates()
+	preloadRuinTemplates()
+	preloadShuttleTemplates()
+	load_ship_templates()
+	preloadOutpostTemplates()
 	for(var/item in subtypesof(/datum/map_template)) //Look for our template subtypes and fire them up to be used later
 		var/datum/map_template/template = new item()
 		map_templates[template.id] = template
@@ -466,3 +490,280 @@ SUBSYSTEM_DEF(mapping)
 		if(!istype(trait, trait_type))
 			continue
 		trait.remove_tracked(removing)
+
+// SHIT START
+/datum/controller/subsystem/mapping/proc/get_map_zone_id(mapzone_id)
+	var/datum/map_zone/returned_mapzone
+	for(var/datum/map_zone/iterated_mapzone as anything in map_zones)
+		if(iterated_mapzone.id == mapzone_id)
+			returned_mapzone = iterated_mapzone
+			break
+	return returned_mapzone
+
+/// Allocates, creates and passes a new virtual level
+/datum/controller/subsystem/mapping/proc/create_virtual_level(new_name, list/traits, datum/map_zone/mapzone, width, height, allocation_type = ALLOCATION_FREE, allocation_jump = DEFAULT_ALLOC_JUMP)
+	/// Because we add an implicit 1 for the coordinate calcuations.
+	width--
+	height--
+	var/list/allocation_coords = SSmapping.get_free_allocation(allocation_type, width, height, allocation_jump)
+	return new /datum/virtual_level(new_name, traits, mapzone, allocation_coords[1], allocation_coords[2], allocation_coords[1] + width, allocation_coords[2] + height, allocation_coords[3])
+
+/// Searches for a free allocation for the passed type and size, creates new physical levels if nessecary.
+/datum/controller/subsystem/mapping/proc/get_free_allocation(allocation_type, size_x, size_y, allocation_jump = DEFAULT_ALLOC_JUMP)
+	var/list/allocation_list
+	var/list/levels_to_check = z_list.Copy()
+	var/created_new_level = FALSE
+	while(TRUE)
+		for(var/datum/space_level/iterated_level as anything in levels_to_check)
+			if(iterated_level.allocation_type != allocation_type)
+				continue
+			allocation_list = find_allocation_in_level(iterated_level, size_x, size_y, allocation_jump)
+			if(allocation_list)
+				return allocation_list
+
+		if(created_new_level)
+			stack_trace("MAPPING: We have failed to find allocation after creating a new level just for it, something went terribly wrong")
+			return FALSE
+		/// None of the levels could faciliate a new allocation, make a new one
+		created_new_level = TRUE
+		levels_to_check.Cut()
+
+		var/allocation_name
+		switch(allocation_type)
+			if(ALLOCATION_FREE)
+				allocation_name = "Free Allocation"
+			if(ALLOCATION_QUADRANT)
+				allocation_name = "Quadrant Allocation"
+			if(ALLOCATION_OCTODRANT)
+				allocation_name = "Octodrant Allocation"
+			else
+				allocation_name = "Unaccounted Allocation"
+
+		levels_to_check += add_new_zlevel("Generated [allocation_name] Level", allocation_type = allocation_type)
+
+/// Finds a box allocation inside a Z level. Uses a methodical box boundary check method
+/datum/controller/subsystem/mapping/proc/find_allocation_in_level(datum/space_level/level, size_x, size_y, allocation_jump)
+	var/target_x = 1
+	var/target_y = 1
+
+	/// Sanity
+	if(size_x > world.maxx || size_y > world.maxy)
+		stack_trace("Tried to find virtual level allocation that cannot possibly fit in a physical level.")
+		return FALSE
+
+	/// Methodical trial and error method
+	while(TRUE)
+		var/upper_target_x = target_x+size_x
+		var/upper_target_y = target_y+size_y
+
+		var/out_of_bounds = FALSE
+		if((target_x < 1 || upper_target_x > world.maxx) || (target_y < 1 || upper_target_y > world.maxy))
+			out_of_bounds = TRUE
+
+		if(!out_of_bounds && level.is_box_free(target_x, target_y, upper_target_x, upper_target_y))
+			return list(target_x, target_y, level.z_value) //hallelujah we found the unallocated spot
+
+		if(upper_target_x > world.maxx) //If we can't increment x, then the search is over
+			break
+
+		var/increments_y = TRUE
+		if(upper_target_y > world.maxy)
+			target_y = 1
+			increments_y = FALSE
+		if(increments_y)
+			target_y += allocation_jump
+		else
+			target_x += allocation_jump
+
+/// Adds new physical space level. DO NOT USE THIS TO LOAD SOMETHING NEW. SSmapping.get_free_allocation() will create any levels nessecary and pass you coordinates to create a new virtual level
+/datum/controller/subsystem/mapping/proc/add_new_zlevel(name, traits = list(), z_type = /datum/space_level, allocation_type = ALLOCATION_FREE, reserve_completely = FALSE)
+	SHOULD_NOT_SLEEP(TRUE)
+	// This proc used to sleep. It caused an infuriating desynchronization: new_z would calculate, the max z would be increased, and then the proc used CHECK_TICK.
+	// As a result, two space_levels could be added to the z_list, each believing itself to reside at the same z-coodinate.
+	// Watch your fucking race conditions.
+	var/new_z = z_list.len + 1
+	if (world.maxz < new_z)
+		world.incrementMaxZ()
+	var/datum/space_level/S = new z_type(new_z, name, traits, allocation_type)
+	z_list += S
+	if(reserve_completely)
+		var/datum/map_zone/mapzone = new(name)
+		new /datum/virtual_level(name, traits, mapzone, 1, 1, world.maxx, world.maxy, new_z)
+	SEND_GLOBAL_SIGNAL(COMSIG_GLOB_NEW_Z, args)
+	generate_linkages_for_z_level(new_z)
+	return S
+
+/// Creates and passes a new map zone
+/datum/controller/subsystem/mapping/proc/create_map_zone(new_name)
+	return new /datum/map_zone(new_name)
+
+#define CHECK_STRING_EXISTS(X) if(!istext(data[X])) { stack_trace("[##X] missing from json!"); continue; }
+#define CHECK_LIST_EXISTS(X) if(!islist(data[X])) { stack_trace("[##X] missing from json!"); continue; }
+/datum/controller/subsystem/mapping/proc/load_ship_templates()
+	ship_purchase_list = list()
+	var/list/filelist = flist("_maps/configs/")
+
+	filelist = sortList(filelist)
+
+	for(var/filename in filelist)
+		var/file = file("_maps/configs/" + filename)
+		if(!file)
+			stack_trace("Could not open map config: [filename]")
+			continue
+		file = file2text(file)
+		if(!file)
+			stack_trace("Map config is not text: [filename]")
+			continue
+
+		var/list/data = json_decode(file)
+		if(!data)
+			stack_trace("Map config is not json: [filename]")
+			continue
+
+		CHECK_STRING_EXISTS("map_name")
+		CHECK_STRING_EXISTS("map_path")
+		CHECK_LIST_EXISTS("job_slots")
+		var/datum/map_template/shuttle/S = new(data["map_path"], data["map_name"], TRUE)
+		S.file_name = data["map_path"]
+		S.ship_class = data["map_name"]
+
+		if(istext(data["map_short_name"]))
+			S.short_name = data["map_short_name"]
+		else
+			S.short_name = copytext(S.name, 1, 20)
+
+		if(istext(data["token_icon_state"]))
+			S.token_icon_state = data["token_icon_state"]
+
+		if(istext(data["faction"]))
+			var/type = text2path(data["faction"])
+			if(!(type in SSfactions.factions))
+				stack_trace("Invalid faction path: [data["faction"]] on [S.name]'s config! Defaulting to Independent.")
+			else
+				S.faction = SSfactions.factions[type]
+
+		if(!S.faction)
+			S.faction = SSfactions.factions[/datum/faction/independent]
+
+		S.category = S.faction.name
+
+		if(istext(data["prefix"]))
+			S.prefix = data["prefix"]
+		if(istext(data["manufacturer"]))
+			S.manufacturer = data["manufacturer"]
+
+		if(S.faction.check_prefix && !(S.prefix in S.faction.prefixes))
+			stack_trace("Faction prefix mismatch for [S.faction.name]: [data["prefix"]] on [S.name]'s config!")
+
+		if(!S.prefix)
+			S.prefix = S.faction.prefixes[1]
+
+		if(islist(data["namelists"]))
+			S.name_categories = data["namelists"]
+
+		if(isnum(data["unique_ship_access"]))
+			S.unique_ship_access = data["unique_ship_access"]
+
+		if(istext(data["description"]))
+			S.description = data["description"]
+
+		if(islist(data["tags"]))
+			S.tags = data["tags"]
+
+		S.job_slots = list()
+		var/list/job_slot_list = data["job_slots"]
+		for(var/job in job_slot_list)
+			var/datum/job/job_slot
+			var/value = job_slot_list[job]
+			var/slots
+			if(isnum(value))
+				//job_slot = GLOB.name_occupations[job]
+				slots = value
+			else if(islist(value))
+				var/datum/outfit/job/job_outfit = text2path(value["outfit"])
+				if(isnull(job_outfit))
+					stack_trace("Invalid job outfit: [value["outfit"]] on [S.name]'s config! Defaulting to assistant clothing.")
+					job_outfit = null // COAL
+				job_slot = new /datum/job(job, job_outfit)
+				job_slot.display_order = length(S.job_slots)
+				//job_slot.wiki_page = value["wiki_page"]
+				//job_slot.officer = value["officer"]
+				slots = value["slots"]
+
+			if(!job_slot || !slots)
+				stack_trace("Invalid job slot entry! [job]: [value] on [S.name]'s config! Excluding job.")
+				continue
+
+			S.job_slots[job_slot] = slots
+
+		if(isnum(data["limit"]))
+			S.limit = data["limit"]
+
+		if(isnum(data["spawn_time_coeff"]))
+			S.spawn_time_coeff = data["spawn_time_coeff"]
+
+		if(isnum(data["officer_time_coeff"]))
+			S.officer_time_coeff = data["officer_time_coeff"]
+
+		if(isnum(data["starting_funds"]))
+			S.starting_funds = data["starting_funds"]
+
+		if(isnum(data["tranist_x_offset"]))
+			S.tranist_x_offset = data["tranist_x_offset"]
+
+		if(isnum(data["tranist_y_offset"]))
+			S.tranist_y_offset = data["tranist_y_offset"]
+
+		if(isnum(data["enabled"]) && data["enabled"])
+			S.enabled = TRUE
+			ship_purchase_list[S.name] = S
+
+		if(isnum(data["space_spawn"]) && data["space_spawn"])
+			S.space_spawn = TRUE
+
+		shuttle_templates[S.file_name] = S
+		map_templates[S.file_name] = S
+#undef CHECK_STRING_EXISTS
+#undef CHECK_LIST_EXISTS
+
+/datum/controller/subsystem/mapping/proc/preloadRuinTemplates()
+	for(var/datum/planet_type/type as anything in subtypesof(/datum/planet_type))
+		planet_types[initial(type.planet)] = new type
+
+	for(var/item in sortList(subtypesof(/datum/map_template/ruin), /proc/cmp_ruincost_priority))
+		var/datum/map_template/ruin/ruin_type = item
+		// screen out the abstract subtypes
+		if(!initial(ruin_type.id))
+			continue
+		var/datum/map_template/ruin/R = new ruin_type()
+
+		map_templates[R.name] = R
+		ruins_templates[R.name] = R
+		ruin_types_list[R.ruin_type] += list(R.name = R)
+
+		var/list/ruin_entry = list()
+		ruin_entry[R] = initial(R.placement_weight)
+		ruin_types_probabilities[R.ruin_type] += ruin_entry
+
+/datum/controller/subsystem/mapping/proc/preloadShuttleTemplates()
+	for(var/item in subtypesof(/datum/map_template/shuttle))
+		var/datum/map_template/shuttle/shuttle_type = item
+		if(!(initial(shuttle_type.file_name)))
+			continue
+
+		var/datum/map_template/shuttle/S = new shuttle_type()
+
+		shuttle_templates[S.file_name] = S
+
+///Initialize all biomes, assoc as type || instance
+/datum/controller/subsystem/mapping/proc/initialize_biomes()
+	for(var/biome_path in subtypesof(/datum/biome))
+		var/datum/biome/biome_instance = new biome_path()
+		biomes[biome_path] += biome_instance
+
+/datum/controller/subsystem/mapping/proc/preloadOutpostTemplates()
+	for(var/datum/map_template/outpost/outpost_type as anything in subtypesof(/datum/map_template/outpost))
+		var/datum/map_template/outpost/outpost_template = new outpost_type()
+		outpost_templates[outpost_template.type] = outpost_template
+		map_templates[outpost_template.name] = outpost_template
+

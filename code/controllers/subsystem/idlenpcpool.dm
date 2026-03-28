@@ -6,6 +6,7 @@ PROCESSING_SUBSYSTEM_DEF(idlenpcpool)
 	runlevels = RUNLEVEL_GAME | RUNLEVEL_POSTGAME
 
 	var/static/list/idle_mobs_by_zlevel[][]
+	var/list/list/idle_mobs_by_virtual_level = list()
 
 /datum/controller/subsystem/processing/idlenpcpool/stat_entry()
 	var/list/idlelist = GLOB.simple_animals[AI_IDLE]

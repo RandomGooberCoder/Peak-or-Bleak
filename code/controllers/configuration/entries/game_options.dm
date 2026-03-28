@@ -360,3 +360,35 @@
 	min_val = 0
 
 /datum/config_entry/flag/dynamic_config_enabled
+
+/// BLIMPMAP
+//When the auto ship locking will start counting up, in minutes
+/datum/config_entry/number/ship_locking_starts
+	config_entry_value = 30
+
+/datum/config_entry/flag/auto_ship_spawn_locking
+	config_entry_value = TRUE
+
+/datum/config_entry/number/max_shuttle_count
+	config_entry_value = 20
+
+/datum/config_entry/string/overmap_generator_type
+	config_entry_value = "solar_system"
+
+/datum/config_entry/number/overmap_size
+	config_entry_value = 30
+	min_val = 1
+
+/datum/config_entry/number/max_overmap_event_clusters
+	config_entry_value = 10
+
+/datum/config_entry/number/max_overmap_events
+	config_entry_value = 150
+
+/datum/config_entry/number/max_overmap_dynamic_events
+	config_entry_value = 25
+
+/datum/config_entry/number/overmap_encounter_size
+	max_val = 255
+	config_entry_value = 127
+	min_val = 127

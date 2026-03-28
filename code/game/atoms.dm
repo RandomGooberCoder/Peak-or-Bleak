@@ -1308,3 +1308,8 @@
 		smooth()
 	else
 		CRASH("[type] called smooth_icon() without valid flags: [smooth]")
+
+///Connect this atom to a shuttle
+/atom/proc/connect_to_shuttle(obj/docking_port/mobile/port, obj/docking_port/stationary/dock)
+	return
+

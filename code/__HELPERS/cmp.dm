@@ -123,3 +123,9 @@ GLOBAL_VAR_INIT(cmp_field, "name")
 
 /proc/cmp_skills_for_display(datum/skill/A, datum/skill/B)
 	return sorttext("[B.abstract_type]", "[A.abstract_type]") || sorttext(B.name, A.name)
+
+/// Effectively sorts first ascending by dock width, then ascending by dock height.
+/proc/cmp_hangarsize_asc(datum/map_template/outpost/hangar/A, datum/map_template/outpost/hangar/B)
+	if(A.dock_width == B.dock_width)
+		return A.dock_height - B.dock_height
+	return A.dock_width - B.dock_width

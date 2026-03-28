@@ -132,6 +132,9 @@ GLOBAL_LIST_EMPTY(personal_objective_minds)
 
 	var/has_bomb = FALSE
 
+	/// A weakref to the /datum/overmap/ship/controlled the original mob spawned on
+	var/datum/weakref/original_ship
+
 /datum/mind/New(key)
 	key = key
 	soulOwner = src

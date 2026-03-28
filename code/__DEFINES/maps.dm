@@ -35,6 +35,19 @@ require only minor tweaks.
 #define ZTRAIT_LAVA_RUINS "Lava Ruins"
 #define ZTRAIT_ISOLATED_RUINS "Isolated Ruins" //Placing ruins on z levels with this trait will use turf reservation instead of usual placement.
 
+// enum - how SSsun should calculate sun exposure on this level
+// if left null, AZIMUTH is assumed
+#define ZTRAIT_SUN_TYPE "Sun Cycle Type"
+	// default & original SSsun behaviour - orbit the 'station' horizontially.
+	// solar panels will cast a line (default 20 steps) and if it is occluded they lose sunlight
+	#define AZIMUTH null
+	// static, exposed
+	// the solar panel must be within 1 tile of space, or another "groundless" turf, to be exposed to sunlight
+	#define STATIC_EXPOSED "Static Exposed"
+	// static, obscured
+	// solar panels are never exposed to sunlight
+	#define STATIC_OBSCURED "Static Obscured"
+
 // number - bombcap is multiplied by this before being applied to bombs
 #define ZTRAIT_BOMBCAP_MULTIPLIER "Bombcap Multiplier"
 
@@ -112,3 +125,19 @@ require only minor tweaks.
 /// TRUE if we're ok with going down
 #define Z_LEVEL_DOWN 2
 #define LARGEST_Z_LEVEL_INDEX Z_LEVEL_DOWN
+
+
+#define ALLOCATION_FREE 1
+#define ALLOCATION_QUADRANT 2
+//Only used for unit testing at the moment, technically splits it into 16 but I didn't like the word for that
+#define ALLOCATION_OCTODRANT 3
+
+#define QUADRANT_MAP_SIZE 127
+#define OCTODRANT_MAP_SIZE 63
+
+#define QUADRANT_SIZE_BORDER 3
+#define TRANSIT_SIZE_BORDER 3
+
+#define DEFAULT_ALLOC_JUMP 5
+
+#define MAP_EDGE_PAD 5

@@ -858,3 +858,9 @@ Remember to update _globalvars/traits.dm if you're adding/removing/renaming trai
 #define TRAIT_MOVEMENT_BLOCKED "movement_blocked"
 /// Mobs that have this trait cannot be extinguished
 #define TRAIT_NO_EXTINGUISH "no_extinguish"
+
+// Traits for ships and other overmap objects
+///This ship is cloaked or hidden and cannot be detected on long-range scanners
+#define TRAIT_CLOAKED "cloaked"
+///Currently only adds a blue-shifting during the cloak animation, will add functionality later when I add anti-ship weapons
+#define TRAIT_BLUESPACE_SHIFT "bluespace_shift"

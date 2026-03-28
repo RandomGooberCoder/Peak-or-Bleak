@@ -13,6 +13,7 @@
 	plane = BLACKNESS_PLANE
 	mouse_opacity = MOUSE_OPACITY_TRANSPARENT
 	invisibility = INVISIBILITY_LIGHTING
+	var/area_flags = VALID_TERRITORY | UNIQUE_AREA
 
 	var/map_name // Set in New(); preserves the name set by the map maker, even if renamed by the Blueprints.
 
@@ -551,3 +552,21 @@ GLOBAL_LIST_EMPTY(teleportlocs)
 	if(href_list["getdescription"])
 		if(detail_text)
 			to_chat(usr, span_info("[detail_text]"))
+
+/area/proc/rename_area(new_name)
+	var/prevname = "[name]"
+	//set_area_machinery_title(src, new_name, prevname)
+	name = new_name
+	sortTim(GLOB.sortedAreas, /proc/cmp_name_asc)
+	return TRUE
+
+/area/hyperspace
+	icon_state = "space"
+	requires_power = TRUE
+	always_unpowered = TRUE
+	dynamic_lighting = DYNAMIC_LIGHTING_DISABLED
+	power_light = FALSE
+	power_equip = FALSE
+	power_environ = FALSE
+	outdoors = TRUE
+	flags_1 = CAN_BE_DIRTY_1

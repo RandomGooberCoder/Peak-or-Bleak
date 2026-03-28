@@ -61,13 +61,16 @@
 	/// If we were going to smooth with an Atom instead overlay this onto self
 	var/neighborlay_self
 
+	// ID of the virtual level we're in
+	var/virtual_z = 0
+
 /turf/vv_edit_var(var_name, new_value)
 	var/static/list/banned_edits = list("x", "y", "z")
 	if(var_name in banned_edits)
 		return FALSE
 	. = ..()
 
-/turf/Initialize(mapload)
+/turf/Initialize(mapload, inherited_virtual_z)
 	SHOULD_CALL_PARENT(FALSE)
 #ifdef TESTSERVER
 	if(!icon_state)
@@ -76,6 +79,9 @@
 	if(flags_1 & INITIALIZED_1)
 		stack_trace("Warning: [src]([type]) initialized multiple times!")
 	flags_1 |= INITIALIZED_1
+
+	if(inherited_virtual_z)
+		virtual_z = inherited_virtual_z
 
 	// by default, vis_contents is inherited from the turf that was here before
 	vis_contents.Cut()

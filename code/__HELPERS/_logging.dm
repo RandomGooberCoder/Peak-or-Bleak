@@ -164,6 +164,9 @@
 	if (CONFIG_GET(flag/log_vote))
 		WRITE_LOG(GLOB.world_game_log, "\[[logtime]] VOTE: [text]")
 
+/proc/log_shuttle(text)
+	if(CONFIG_GET(flag/log_shuttle))
+		WRITE_LOG(GLOB.world_shuttle_log, "OVERMAP: [text]")
 
 /proc/log_topic(text)
 	WRITE_LOG(GLOB.world_game_log, "\[[logtime]] TOPIC: [text]")
